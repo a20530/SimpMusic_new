@@ -1,4 +1,4 @@
-name: Build fixed debug APK (search history focus fix)
+name: Build fixed release APK (search history focus fix)
 on:
   workflow_dispatch:
 
@@ -39,16 +39,37 @@ jobs:
           PYEOF
           python3 /tmp/fix.py
 
+      - name: Make release build self-signed and installable alongside original
+        run: |
+          cat > /tmp/rel.py <<'PYEOF'
+          import sys
+          F = "androidApp/build.gradle.kts"
+          s = open(F).read()
+          old = "        release {\n            isMinifyEnabled = true"
+          if s.count(old) != 1:
+              sys.exit("Release block not found - upstream build file changed")
+          s = s.replace(old,
+              "        release {\n"
+              "            signingConfig = signingConfigs.getByName(\"debug\")\n"
+              "            applicationIdSuffix = \".fix\"\n"
+              "            versionNameSuffix = \"-fix\"\n"
+              "            isMinifyEnabled = true")
+          open(F, "w").write(s)
+          print("Release build set to self-signed .fix variant")
+
+          PYEOF
+          python3 /tmp/rel.py
+
       - name: Empty local.properties
         run: touch local.properties
 
       - name: Generate aboutLibraries.json
         run: ./gradlew exportLibraryDefinitions
 
-      - name: Build debug APK
-        run: ./gradlew androidApp:assembleDebug
+      - name: Build release APK
+        run: ./gradlew androidApp:assembleRelease
 
       - uses: actions/upload-artifact@v4
         with:
-          name: simpmusic-fixed-debug
-          path: androidApp/build/outputs/apk/debug/*.apk
+          name: simpmusic-fixed-release
+          path: androidApp/build/outputs/apk/release/*arm64-v8a*.apk
