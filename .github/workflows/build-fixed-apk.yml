@@ -1,0 +1,54 @@
+name: Build fixed debug APK (search history focus fix)
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: "microsoft"
+          cache: 'gradle'
+
+      - name: Apply search history focus fix
+        run: |
+          cat > /tmp/fix.py <<'PYEOF'
+          import re, sys
+          F = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/other/SearchScreen.kt"
+          s = open(F).read()
+          pat = re.compile(
+              r"AnimatedContent\(\s*targetState = isContentAtTop,.*?\{ atTop ->\s*Column\(\s*modifier =\s*Modifier\s*\.fillMaxWidth\(\)",
+              re.S)
+          if len(pat.findall(s)) != 1:
+              sys.exit("Patch target not found - upstream code changed")
+          s = pat.sub(
+              "run {\n            Column(\n                modifier =\n                    Modifier\n"
+              "                        .align(Alignment.TopCenter)\n"
+              "                        .onGloballyPositioned { searchBarHeightPx = it.size.height }\n"
+              "                        .fillMaxWidth()", s)
+          s = s.replace("if (atTop) {", "if (isContentAtTop) {", 1)
+          open(F, "w").write(s)
+          print("Fix applied")
+
+          PYEOF
+          python3 /tmp/fix.py
+
+      - name: Empty local.properties
+        run: touch local.properties
+
+      - name: Generate aboutLibraries.json
+        run: ./gradlew exportLibraryDefinitions
+
+      - name: Build debug APK
+        run: ./gradlew androidApp:assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: simpmusic-fixed-debug
+          path: androidApp/build/outputs/apk/debug/*.apk
