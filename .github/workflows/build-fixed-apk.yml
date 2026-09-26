@@ -60,6 +60,20 @@ jobs:
           PYEOF
           python3 /tmp/rel.py
 
+      - name: Tell R8 to ignore optional missing classes
+        run: |
+          cat > /tmp/pro.py <<'PYEOF'
+          F = "androidApp/proguard-rules.pro"
+          with open(F, "a") as f:
+              f.write("\n# Self-build: optional device-provided window classes are not on the classpath\n"
+                      "-dontwarn androidx.window.extensions.**\n"
+                      "-dontwarn androidx.window.sidecar.**\n"
+                      "-ignorewarnings\n")
+          print("R8 missing-class rules added")
+
+          PYEOF
+          python3 /tmp/pro.py
+
       - name: Empty local.properties
         run: touch local.properties
 
