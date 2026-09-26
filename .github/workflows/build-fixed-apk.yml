@@ -57,6 +57,22 @@ jobs:
           PYEOF
           python3 /tmp/dbg.py
 
+      - name: Disable official-build check (personal build only)
+        run: |
+          cat > /tmp/chk.py <<'PYEOF'
+          import sys
+          F = "androidApp/src/main/java/com/maxrave/simpmusic/MainActivity.kt"
+          s = open(F).read()
+          old = "if (!BuildConfig.DEBUG) viewModel.checkOfficialBuild(packageName, signingCertSha256())"
+          if s.count(old) != 1:
+              sys.exit("Official-build check not found - upstream code changed")
+          s = s.replace(old, "// Personal self-build: official-build check disabled")
+          open(F, "w").write(s)
+          print("Official-build check disabled for personal build")
+
+          PYEOF
+          python3 /tmp/chk.py
+
       - name: Empty local.properties
         run: touch local.properties
 
