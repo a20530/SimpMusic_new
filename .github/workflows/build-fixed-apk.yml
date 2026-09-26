@@ -1,4 +1,4 @@
-name: Build fixed release APK (search history focus fix)
+name: Build fixed fast APK (search history focus fix)
 on:
   workflow_dispatch:
 
@@ -39,40 +39,23 @@ jobs:
           PYEOF
           python3 /tmp/fix.py
 
-      - name: Make release build self-signed and installable alongside original
+      - name: Make build non-debuggable (fast) and installable alongside original
         run: |
-          cat > /tmp/rel.py <<'PYEOF'
+          cat > /tmp/dbg.py <<'PYEOF'
           import sys
           F = "androidApp/build.gradle.kts"
           s = open(F).read()
-          old = "        release {\n            isMinifyEnabled = true"
+          old = '        debug {\n            isMinifyEnabled = false\n            applicationIdSuffix = ".dev"\n            versionNameSuffix = "-dev"'
           if s.count(old) != 1:
-              sys.exit("Release block not found - upstream build file changed")
+              sys.exit("Debug block not found - upstream build file changed")
           s = s.replace(old,
-              "        release {\n"
-              "            signingConfig = signingConfigs.getByName(\"debug\")\n"
-              "            applicationIdSuffix = \".fix\"\n"
-              "            versionNameSuffix = \"-fix\"\n"
-              "            isMinifyEnabled = true")
+              '        debug {\n            isMinifyEnabled = false\n            isDebuggable = false\n'
+              '            applicationIdSuffix = ".fix"\n            versionNameSuffix = "-fix"')
           open(F, "w").write(s)
-          print("Release build set to self-signed .fix variant")
+          print("Debug build set to non-debuggable .fix variant")
 
           PYEOF
-          python3 /tmp/rel.py
-
-      - name: Tell R8 to ignore optional missing classes
-        run: |
-          cat > /tmp/pro.py <<'PYEOF'
-          F = "androidApp/proguard-rules.pro"
-          with open(F, "a") as f:
-              f.write("\n# Self-build: optional device-provided window classes are not on the classpath\n"
-                      "-dontwarn androidx.window.extensions.**\n"
-                      "-dontwarn androidx.window.sidecar.**\n"
-                      "-ignorewarnings\n")
-          print("R8 missing-class rules added")
-
-          PYEOF
-          python3 /tmp/pro.py
+          python3 /tmp/dbg.py
 
       - name: Empty local.properties
         run: touch local.properties
@@ -80,10 +63,10 @@ jobs:
       - name: Generate aboutLibraries.json
         run: ./gradlew exportLibraryDefinitions
 
-      - name: Build release APK
-        run: ./gradlew androidApp:assembleRelease
+      - name: Build APK
+        run: ./gradlew androidApp:assembleDebug
 
       - uses: actions/upload-artifact@v4
         with:
-          name: simpmusic-fixed-release
-          path: androidApp/build/outputs/apk/release/*arm64-v8a*.apk
+          name: simpmusic-fixed-fast
+          path: androidApp/build/outputs/apk/debug/*.apk
